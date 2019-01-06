@@ -7,6 +7,55 @@
 #include "font.h"
 #include "ds.h"
 
+
+
+static uint32_t* utf8_to_utf32( char*  u8, size_t* outLen) {
+	size_t len = 0;
+	size_t u8len = strlen(u8);
+	
+	uint32_t* u32 = malloc((u8len + 1) * sizeof(u32)); // just overallocate
+	
+	uint8_t* s = (uint8_t*)u8;
+	
+#define to32s(x, s) (((uint32_t)(x)) << (s))
+	
+	int i = 0;
+	while(*s) {
+		if((s[0] & 0x80) == 0x00) { // single byte
+			u32[i] = s[0];
+			s++;
+		}
+		else if((s[0] & 0xe0) == 0xc0) { // two bytes
+			if(s[1] == 0) goto MALFORMED;
+			u32[i] = to32s(s[0] & 0x1f, 6) | to32s(s[1] & 0x3f, 0);
+			s += 2;
+		}
+		else if((s[0] & 0xf0) == 0xe0) { // three bytes
+			if(s[1] == 0 || s[2] == 0) goto MALFORMED;
+			u32[i] = to32s(s[0] & 0x1f, 12) | to32s(s[1] & 0x3f, 6) | to32s(s[2] & 0x3f, 0);
+			s += 3;
+		}
+		else if((s[0] & 0xf8) == 0xf0) { // four bytes
+			if(s[1] == 0 || s[2] == 0 || s[3] == 0) goto MALFORMED;
+			u32[i] = to32s(s[0] & 0x1f, 18) | to32s(s[1] & 0x3f, 12) | to32s(s[2] & 0x3f, 6) | to32s(s[3] & 0x3f, 0);
+			s += 4;
+		}
+		
+		i++;
+	}
+	
+	u32[i] = 0;
+	if(outLen) *outLen = i;
+	
+	return u32;
+	
+	
+MALFORMED:
+	fprintf(stderr, "Malformed UTF-8 sequence.\n");
+	exit(1); // we ain't havin none of that shit
+}
+
+
 static char* strappend(char* a, const char* const b);
 static char* strappendf(char* a, const char* const b);
 
@@ -30,6 +79,32 @@ static char* strappend(char* a, const char* const b) {
 }
 
 
+static uint32_t* u32strdup(const uint32_t* const s) {
+	size_t l = u32strlen(s);
+	uint32_t* o = malloc(l * sizeof(*s));
+	memcpy(o, s, (l + 1) * sizeof(*s));
+	return o;
+}
+
+static uint32_t* u32strappend(uint32_t* a, const uint32_t* const b) {
+	if(a == NULL) return u32strdup(b);
+	if(b == NULL) return a;
+	
+	size_t la = u32strlen(a);
+	size_t lb = u32strlen(b);
+	uint32_t* o = malloc(la + lb + 1);
+	memcpy(o, a, la * sizeof(*a));
+	memcpy(o + (la * sizeof(*a)), b, lb * sizeof(*b));
+	o[(la + lb) * sizeof(*o)] = 0;
+	return o;
+}
+
+static uint32_t* u32strappendf(uint32_t* a, const uint32_t* const b) {
+	uint32_t* o = u32strappend(a, b);
+	free(a);
+	return o;
+}
+
 static void struniq(char* s) {
 	if(s == NULL || s[0] == 0 || s[1] == 0) return;
 	char* b = s;
@@ -44,19 +119,33 @@ static void struniq(char* s) {
 	*(b + 1) = 0;
 }
 
+static void u32struniq(uint32_t* s) {
+	if(s == NULL || s[0] == 0 || s[1] == 0) return;
+	uint32_t* b = s;
+	s++;
+	while(*s) {
+		if(*s != *b) {
+			b++;
+			*b = *s;
+		}
+		s++;
+	}
+	*(b + 1) = 0;
+}
 
 
-static int cs_comp(char* a, char* b) {
+
+static int cs_comp(uint32_t* a, uint32_t* b) {
 	return *a - *b;
 }
 
 // frees a
-static char* appendCharset(char* a, char* b) {
-	char* o = strappendf(a, b);
+static uint32_t* appendCharset(uint32_t* a, const uint32_t* const b) {
+	uint32_t* o = u32strappendf(a, b);
 	
-	qsort(o, strlen(o), 1, (void*)cs_comp);
+	qsort(o, u32strlen(o), sizeof(uint32_t), (void*)cs_comp);
 	
-	struniq(o);
+	u32struniq(o);
 	
 	return o;
 }
@@ -73,15 +162,15 @@ char* helpText = "" \
 	"sdfgen [GLOBAL OPTION]... [-f FONT SIZES [OPTION]...]... [outfile]\n" \
 	"\n" \
 	"EXAMPLE:\n" \
-	"  sdfgen -b -m 8 -o 4 -t 256 \"Courier\" 8,12,16 -i \"Arial\" 32 myfonts_sdf\n" \
+	"  sdfgen -b -m 8 -o 4 -t 256 -f \"Courier\" 8,12,16 -i -f \"Arial\" 32 myfonts_sdf\n" \
 	"     -b - generate bold for all fonts\n" \
 	"     -m 8 - SDF magnitude of 8 pixels\n" \
 	"     -o 4 - oversample by 4x\n" \
 	"     -t 256 - output textures have 256px dimensions\n" \
-	"     \"Courier\" - first font name \n" \
+	"     -f \"Courier\" - first font name \n" \
 	"        8,12,16 - generate outputs of size 8, 12, and 16 px for this font \n" \
 	"        -i - also generate italic for this font\n" \
-	"     \"Arial\" - second font name \n" \
+	"     -f \"Arial\" - second font name \n" \
 	"        32 - generate outputs of size 32px for this font \n" \
 	"     myfonts_sdf - output will be myfonts_sdf_[n].png and myfonts_sdf.json\n" \
 	"\n" \
@@ -120,7 +209,7 @@ typedef struct FontOpts {
 	char italic;
 	char bold_italic;
 	char omit_regular;
-	char* charset;
+	uint32_t* charset;
 	VEC(int) sizes;
 } FontOpts;
 
@@ -147,7 +236,7 @@ int main(int argc, char* argv[]) {
 	char* outfile = NULL;
 	char* json_outfile = NULL;
 	char* png_outfile = NULL;
-	char* g_charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 `~!@#$%^&*()_+|-=\\{}[]:;<>?,./'\"";
+	uint32_t* g_charset = utf8_to_utf32("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 `~!@#$%^&*()_+|-=\\{}[]:;<>?,./'\"", NULL);
 	char g_bold = 0;
 	char g_italic = 0;
 	char g_bold_italic = 0;
@@ -192,7 +281,7 @@ int main(int argc, char* argv[]) {
 			printf("oh no!!\n");
 			// TODO: detect and strip quotes
 			an++;
-			g_charset = strdup(argv[an]);
+			g_charset = utf8_to_utf32(argv[an], NULL);
 			continue;
 		}
 		if(0 == strcmp(arg, "-i")) {
@@ -321,7 +410,7 @@ int main(int argc, char* argv[]) {
 					// TODO: detect and strip quotes
 					printf("C!!\n");
 					an++;
-					fo->charset = strdup(argv[an]);
+					fo->charset = utf8_to_utf32(argv[an], NULL);
 					continue;
 				}
 				// italics
@@ -426,7 +515,7 @@ int main(int argc, char* argv[]) {
 		VEC_SORT(&fo->sizes, (void*)int_comp);
 		
 		totalFacesToRender += n * VEC_LEN(&fo->sizes);
-		totalGlyphsToRender += n * strlen(fo->charset) * VEC_LEN(&fo->sizes);
+		totalGlyphsToRender += n * u32strlen(fo->charset) * VEC_LEN(&fo->sizes);
 	}
 	
 	// TODO: check that each face can be loaded and is unique
@@ -503,7 +592,7 @@ int main(int argc, char* argv[]) {
 		FontManager* fm;
 		
 		fm = FontManager_alloc();
-		
+
 		fm->pngFileFormat = png_outfile;
 		
 		fm->oversample = oversample;

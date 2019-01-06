@@ -60,7 +60,7 @@ typedef struct GUIFont {
 typedef struct FontGen {
 	GUIFont* font;
 	
-	int code;
+	uint32_t code;
 	char italic;
 	char bold;
 	
@@ -94,7 +94,7 @@ typedef struct FontGen {
 
 
 typedef struct FontManager {
-	HashTable(GUIFont*) fonts;
+	VEC(GUIFont*) fonts;
 	
 	// SDF generation 
 	VEC(FontGen*) gen;
@@ -119,7 +119,7 @@ typedef struct FontManager {
 void FontManager_createAtlas(FontManager* fm);
 void FontManager_saveAtlas(FontManager* fm, char* path);
 int FontManager_loadAtlas(FontManager* fm, char* path);
-void FontManager_addFont2(FontManager* fm, char* name, char* charset, int size, char bold, char italic);
+void FontManager_addFont2(FontManager* fm, char* name, uint32_t* charset, int size, char bold, char italic);
 void FontManager_finalize(FontManager* fm);
 
 void FontManager_saveJSON(FontManager* fm, char* path);
@@ -129,6 +129,14 @@ GUIFont* FontManager_findFont(FontManager* fm, char* name);
 FontManager* FontManager_alloc();
 void FontManager_init(FontManager* fm);
 
+
+
+
+static size_t u32strlen(const uint32_t* const s) {
+	size_t l = 0;
+	while(s[l] != 0) l++;
+	return l;
+}
 
 
 

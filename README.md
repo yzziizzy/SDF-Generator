@@ -1,20 +1,23 @@
 # SDF-Generator
 Generates SDF textures and json metadata files for webgl applications.
 
+Includes UTF-8 support.
+
+
 ```
 Usage:
 sdfgen [GLOBAL OPTION]... [-f FONT SIZES [OPTION]...]... [outfile]
 
 EXAMPLE:
-  sdfgen -b -m 8 -o 4 -t 256 "Courier" 8,12,16 -i "Arial" 32 myfonts_sdf
+  sdfgen -b -m 8 -o 4 -t 256 -f "Courier" 8,12,16 -i -f "Arial" 32 myfonts_sdf
      -b - generate bold for all fonts
      -m 8 - SDF magnitude of 8 pixels
      -o 4 - oversample by 4x
      -t 256 - output textures have 256px dimensions
-     "Courier" - first font name 
+     -f "Courier" - first font name 
         8,12,16 - generate outputs of size 8, 12, and 16 px for this font 
         -i - also generate italic for this font
-     "Arial" - second font name 
+     -f "Arial" - second font name 
         32 - generate outputs of size 32px for this font 
      myfonts_sdf - output will be myfonts_sdf_[n].png and myfonts_sdf.json
 
@@ -34,7 +37,7 @@ FONT OPTIONS:
   --          Stop parsing a font and return to global options. Not required.
   -b         Generate Bold
   -bi        Generate Bold Italic
-  -c CHARSET Specify the charset. Default is every character on a US keyboard.
+  -c CHARSET Specify the charset, in UTF-8. Default is every character on a US keyboard.
   -i         Generate Italic
   --omit-regular  Do not generate the regular font face
   -s N[,...] Generate these output font sizes.

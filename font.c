@@ -24,7 +24,7 @@
 
 // temp
 static void addFont(FontManager* fm, char* name);
-static FontGen* addChar(FontManager* fm, FT_Face* ff, int code, int fontSize, char bold, char italic);
+static FontGen* addChar(FontManager* fm, FT_Face* ff, uint32_t code, int fontSize, char bold, char italic);
 
 
 
@@ -50,10 +50,6 @@ FontManager* FontManager_alloc() {
 	FontManager* fm;
 	
 	fm = calloc(1, sizeof(*fm));
-	HT_init(&fm->fonts, 4);
-	fm->oversample = 16;
-	fm->maxAtlasSize = 512;
-
 	FontManager_init(fm);
 	
 	return fm;
@@ -61,37 +57,14 @@ FontManager* FontManager_alloc() {
 
 
 void FontManager_init(FontManager* fm) {
-	
-// 	if(FontManager_loadAtlas(fm, "fonts.atlas")) {
-// 		
-// 		FontManager_addFont(fm, "Arial");
-// 		FontManager_addFont(fm, "Impact");
-// 		FontManager_addFont(fm, "Modern");
-// 		FontManager_addFont(fm, "Times New Roman");
-// 		FontManager_addFont(fm, "Courier New");
-// 		FontManager_addFont(fm, "Copperplate");
-// 		
-// 		FontManager_finalize(fm);
-// 
-// 		FontManager_createAtlas(fm);
-// 		FontManager_saveAtlas(fm, "fonts.atlas");
-// 	}
-// 	
-// 	HT_get(&fm->fonts, "Arial", &fm->helv);
+	VEC_INIT(&fm->fonts);
+	VEC_INIT(&fm->atlas);
+	fm->oversample = 16;
+	fm->maxAtlasSize = 512;
 }
 
 
 
-
-GUIFont* FontManager_findFont(FontManager* fm, char* name) {
-	GUIFont* f;
-	
-// 	if(HT_get(&fm->fonts, name, &f)) {
-// 		return fm->helv; // fallback
-// 	}
-	
-	return f;
-}
 
 
 
@@ -227,6 +200,9 @@ void CalcSDF_Software_(FontGen* fg) {
 		}
 	}
 	
+	if(fg->sdfGlyphSize.x <= 0 || fg->sdfGlyphSize.y <= 0) {
+		printf("broken glyph: %s-%d #%d\n", fg->font->name, fg->font->size, fg->code);
+	}
 	
 	// find the bounds of the sdf data
 	// first rows
@@ -285,11 +261,11 @@ void CalcSDF_Software_(FontGen* fg) {
 
 
 
-static FontGen* addChar(FontManager* fm, FT_Face* ff, int code, int fontSize, char bold, char italic) {
+static FontGen* addChar(FontManager* fm, FT_Face* ff, uint32_t code, int fontSize, char bold, char italic) {
 	FontGen* fg;
 	FT_Error err;
 	FT_GlyphSlot slot;
-	
+
 	fg = calloc(1, sizeof(*fg));
 	fg->code = code;
 	fg->italic = italic;
@@ -340,30 +316,6 @@ static FontGen* addChar(FontManager* fm, FT_Face* ff, int code, int fontSize, ch
 		slot->bitmap.buffer, // source
 		fg->rawGlyph); // destination
 	
-	/*
-	/// TODO move to multithreaded pass
-	CalcSDF_Software_(fg);
-	
-	// done with the raw data
-	free(fg->rawGlyph);
-	*/
-	
-	/*
-	
-	printf("raw size: %d, %d\n", fg->rawGlyphSize.x, fg->rawGlyphSize.y);
-	printf("sdf size: %d, %d\n", fg->sdfGlyphSize.x, fg->sdfGlyphSize.y);
-	printf("bounds: %f,%f, %f,%f\n",
-		fg->sdfBounds.min.x,
-		fg->sdfBounds.min.y,
-		fg->sdfBounds.max.x,
-		fg->sdfBounds.max.y
-		   
-	);
-
-	writePNG("sdf-raw.png", 1, fg->rawGlyph, fg->rawGlyphSize.x, fg->rawGlyphSize.y);
-	writePNG("sdf-pct.png", 1, fg->sdfGlyph, fg->sdfGlyphSize.x, fg->sdfGlyphSize.y);
-	*/
-	
 	return fg;
 }
 
@@ -374,7 +326,7 @@ void* sdf_thread(void* _fm) {
 	int i = 0;
 	while(1) {
 		i = atomic_fetch_add(&fm->genCounter, 1);
-		
+
 		if(i >= VEC_LEN(&fm->gen)) break;
 		
 		FontGen* fg = VEC_ITEM(&fm->gen, i);
@@ -439,14 +391,13 @@ GUIFont* GUIFont_alloc(char* name) {
 
 
 
-void FontManager_addFont2(FontManager* fm, char* name, char* charset, int size, char bold, char italic) {
+void FontManager_addFont2(FontManager* fm, char* name, uint32_t* charset, int size, char bold, char italic) {
 	GUIFont* f;
 	FT_Error err;
 	FT_Face fontFace;
-	
 	//defaultCharset = "I";
 	
-	int len = strlen(charset);
+	int len = u32strlen(charset);
 	
 	int fontSize = size; // pixels
 	
@@ -466,10 +417,13 @@ void FontManager_addFont2(FontManager* fm, char* name, char* charset, int size, 
 		exit(1);
 	}
 	
-	if(HT_get(&fm->fonts, name, &f)) {
-		f = GUIFont_alloc(name);
-		HT_set(&fm->fonts, name, f);
-	}
+	// switch to unicode
+	// all character code inputs are unicode codepoints
+	FT_Select_Charmap(fontFace, FT_ENCODING_UNICODE);
+	
+	f = GUIFont_alloc(name);
+	f->size = size;
+	VEC_PUSH(&fm->fonts, f);
 	
 	for(int i = 0; i < len; i++) {
 // 		printf("calc: '%s':%d:%d %c\n", name, bold, italic, charset[i]);
@@ -479,8 +433,6 @@ void FontManager_addFont2(FontManager* fm, char* name, char* charset, int size, 
 		VEC_PUSH(&fm->gen, fg);
 	}
 	
-	
-
 }
 
 
@@ -503,8 +455,9 @@ void FontManager_createAtlas(FontManager* fm) {
 	
 	//printf("naive min tex size: %d -> %d (%d)\n", naiveSize, pot, totalWidth);
 	
-	pot = MIN(pot, fm->maxAtlasSize);
-	
+	if(fm->maxAtlasSize > 0) {
+		pot = MIN(pot, fm->maxAtlasSize);
+	}
 	
 	// test the packing
 	int row = 0;
@@ -544,7 +497,7 @@ void FontManager_createAtlas(FontManager* fm) {
 				hext = 0;
 			}
 		}
-		
+
 		// blit the sdf bitmap data
 		blit(
 			gen->sdfBounds.min.x, gen->sdfBounds.min.y, // src x and y offset for the image
@@ -553,7 +506,6 @@ void FontManager_createAtlas(FontManager* fm) {
 			gen->sdfGlyphSize.x, pot, // src and dst row widths
 			gen->sdfGlyph, // source
 			texData); // destination
-		
 		
 		// copy info over to font
 		struct charInfo* c;
@@ -611,13 +563,6 @@ void FontManager_createAtlas(FontManager* fm) {
 	if(fm->verbose >= 0) printf("Saved atlas file '%s'\n", buf);
 	
 	VEC_FREE(&fm->gen);
-	
-	
-// 	writePNG("sdf-comp.png", 1, texData, pot, pot);
-
-	
-	//exit(1);
-	
 	
 }
 
@@ -682,7 +627,7 @@ void FontManager_saveJSON(FontManager* fm, char* path) {
 	fprintf(f, "\t},\n");
 	
 	fprintf(f, "\tfonts: {\n");
-	HT_LOOP(&fm->fonts, name, GUIFont*, font) {
+	VEC_EACH(&fm->fonts, fi, font) {
 		fprintf(f, "\t\t\"%s\": {\n", font->name);
 		
 		fprintf(f, "\t\t\tname: \"%s\",\n", font->name);
