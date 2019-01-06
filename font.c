@@ -24,7 +24,22 @@
 
 // temp
 static void addFont(FontManager* fm, char* name);
-static FontGen* addChar(FontManager* fm, FT_Face* ff, uint32_t code, int fontSize, char bold, char italic);
+static FontGen* addChar(FontManager* fm, FT_Face* _ff, uint32_t code, int fontSize, char bold, char italic);
+
+
+static FT_Library ftLib = NULL;
+static void checkFTlib();
+
+static void checkFTlib() {
+	FT_Error err;
+	if(!ftLib) {
+		err = FT_Init_FreeType(&ftLib);
+		if(err) {
+			fprintf(stderr, "Could not initialize FreeType library.\n");
+			exit(1);
+		}
+	}
+}
 
 
 
@@ -57,10 +72,26 @@ FontManager* FontManager_alloc() {
 
 
 void FontManager_init(FontManager* fm) {
+	FT_Error err;
+	
 	VEC_INIT(&fm->fonts);
 	VEC_INIT(&fm->atlas);
 	fm->oversample = 16;
 	fm->maxAtlasSize = 512;
+	
+	checkFTlib();
+	
+	char* fontPath = "./unifont-11.0.03.ttf";
+	
+	err = FT_New_Face(ftLib, fontPath, 0, &fm->fallback);
+	if(err) {
+		fprintf(stderr, "Could not access fallback font at '%s'. (%x)\n", fontPath, (int)err);
+	//	exit(1);
+	}
+	
+	// switch to unicode
+	// all character code inputs are unicode codepoints
+	FT_Select_Charmap(fm->fallback, FT_ENCODING_UNICODE);
 }
 
 
@@ -104,19 +135,6 @@ static void blit(
 	}
 }
 
-static FT_Library ftLib = NULL;
-static void checkFTlib();
-
-static void checkFTlib() {
-	FT_Error err;
-	if(!ftLib) {
-		err = FT_Init_FreeType(&ftLib);
-		if(err) {
-			fprintf(stderr, "Could not initialize FreeType library.\n");
-			exit(1);
-		}
-	}
-}
 
 
 static float dist(int a, int b) {
@@ -261,10 +279,11 @@ void CalcSDF_Software_(FontGen* fg) {
 
 
 
-static FontGen* addChar(FontManager* fm, FT_Face* ff, uint32_t code, int fontSize, char bold, char italic) {
+static FontGen* addChar(FontManager* fm, FT_Face* _ff, uint32_t code, int fontSize, char bold, char italic) {
 	FontGen* fg;
 	FT_Error err;
 	FT_GlyphSlot slot;
+	FT_Face* ff;
 
 	fg = calloc(1, sizeof(*fg));
 	fg->code = code;
@@ -274,6 +293,17 @@ static FontGen* addChar(FontManager* fm, FT_Face* ff, uint32_t code, int fontSiz
 	fg->magnitude = fm->magnitude;
 	
 	int rawSize = fontSize * fm->oversample;
+	
+	if(0 != FT_Get_Char_Index(*_ff, code)) {
+		ff = _ff;
+	} 
+	else if(0 != FT_Get_Char_Index(fm->fallback, code)) {
+		ff = &fm->fallback;
+	}
+	else {
+		// the character is missing.
+		return NULL;
+	}
 	
 	
 	err = FT_Set_Pixel_Sizes(*ff, 0, rawSize);
@@ -428,6 +458,7 @@ void FontManager_addFont2(FontManager* fm, char* name, uint32_t* charset, int si
 	for(int i = 0; i < len; i++) {
 // 		printf("calc: '%s':%d:%d %c\n", name, bold, italic, charset[i]);
 		FontGen* fg = addChar(fm, &fontFace, charset[i], fontSize, bold, italic);
+		if(!fg) continue;
 		fg->font = f;
 		
 		VEC_PUSH(&fm->gen, fg);

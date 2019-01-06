@@ -96,6 +96,8 @@ typedef struct FontGen {
 typedef struct FontManager {
 	VEC(GUIFont*) fonts;
 	
+	FT_Face fallback;
+	
 	// SDF generation 
 	VEC(FontGen*) gen;
 	atomic_int genCounter;
