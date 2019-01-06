@@ -557,11 +557,24 @@ void FontManager_createAtlas(FontManager* fm) {
 		
 		// copy info over to font
 		struct charInfo* c;
-		if(gen->bold && gen->italic) c = &gen->font->boldItalic[gen->code];
-		else if(gen->bold) c = &gen->font->bold[gen->code];
-		else if(gen->italic) c = &gen->font->italic[gen->code];
-		else c = &gen->font->regular[gen->code];
+		if(gen->bold && gen->italic) {
+			gen->font->hasBoldItalic |= 1;
+			c = &gen->font->boldItalic[gen->code];
+		}
+		else if(gen->bold) {
+			gen->font->hasBold |= 1;
+			c = &gen->font->bold[gen->code];
+		}
+		else if(gen->italic) {
+			gen->font->hasItalic |= 1;
+			c = &gen->font->italic[gen->code];
+		}
+		else {
+			gen->font->hasRegular |= 1;
+			c = &gen->font->regular[gen->code];
+		}
 		
+		c->code = gen->code;
 		c->texIndex = VEC_LEN(&fm->atlas);
 		c->texelOffset.x = rowWidth;
 		c->texelOffset.y = hext;
@@ -578,7 +591,7 @@ void FontManager_createAtlas(FontManager* fm) {
 		c->size.x = gen->sdfDataSize.x;
 		c->size.y = gen->sdfDataSize.y;
 		
-//		printf("toff: %f, %f \n", c->texNormOffset.x, c->texNormOffset.y);
+		printf("toff: %f, %f \n", c->texNormOffset.x, c->texNormOffset.y);
 //		printf("tsize: %f, %f \n", c->texNormSize.x, c->texNormSize.y);
 //		printf("ltoff: %f, %f \n", c->topLeftOffset.x, c->topLeftOffset.y);
 		
@@ -607,6 +620,86 @@ void FontManager_createAtlas(FontManager* fm) {
 	
 }
 
+
+void printCharinfo(FILE* f, char* prefix, struct charInfo* ci) {
+	if(ci->code == 0) return;
+	fprintf(f, "%s%d: {\n", prefix, ci->code);
+	fprintf(f, "%s\tcode: %d,\n", prefix, ci->code);
+	fprintf(f, "%s\ttexIndex: %d,\n", prefix, ci->texIndex);
+	fprintf(f, "%s\ttexelOffset: [%d, %d],\n", prefix, ci->texelOffset.x, ci->texelOffset.y);
+	fprintf(f, "%s\ttexelSize: [%d, %d],\n", prefix, ci->texelSize.x, ci->texelSize.y);
+	fprintf(f, "%s\tnormalizedOffset: [%f, %f],\n", prefix, ci->texNormOffset.x, ci->texNormOffset.y);
+	fprintf(f, "%s\tnormalizedSize: [%f, %f],\n", prefix, ci->texNormSize.x, ci->texNormSize.y);
+	fprintf(f, "%s\tadvance: %f,\n", prefix, ci->advance);
+	fprintf(f, "%s\tboxOffset: [%f, %f],\n", prefix, ci->topLeftOffset.x, ci->topLeftOffset.y);
+	fprintf(f, "%s\tboxSize: [%f, %f]\n", prefix, ci->size.x, ci->size.y);
+	fprintf(f, "%s},\n", prefix);
+}
+
+
+void FontManager_saveJSON(FontManager* fm, char* path) {
+	FILE* f;
+	printf("writing json\n");
+	f = fopen(path, "w");
+	if(!f) {
+		fprintf(stderr, "Could not save JSON metadata to '%s'\n", path);
+		exit(1);
+	}
+	
+	fprintf(f, "{\n");
+	
+	fprintf(f, "\tlayers: [\n");
+	VEC_LOOP(&fm->atlas, fi) {
+		fprintf(f, "\t\t\"");
+		fprintf(f, fm->pngFileFormat, (int)fi);
+		fprintf(f, "\",\n");
+	}
+	fprintf(f, "\t],\n");
+	fprintf(f, "\tfonts: {\n");
+	HT_LOOP(&fm->fonts, name, GUIFont*, font) {
+		fprintf(f, "\t\t\"%s\": {\n", font->name);
+		
+		fprintf(f, "\t\t\tname: \"%s\",\n", font->name);
+		fprintf(f, "\t\t\tsize: %d,\n", font->size);
+		
+		if(font->hasRegular) {
+			fprintf(f, "\t\t\tregular: {\n");
+			for(int i = 0; i < font->charsLen; i++) {
+				printCharinfo(f, "\t\t\t\t", font->regular + i);
+			}
+			fprintf(f, "\t\t\t},\n");
+		}
+		if(font->hasBold) {
+			fprintf(f, "\t\t\tbold: {\n");
+			for(int i = 0; i < font->charsLen; i++) {
+				printCharinfo(f, "\t\t\t\t", &font->bold[i]);
+			}
+			fprintf(f, "\t\t\t},\n");
+		}
+		if(font->hasItalic) {
+			fprintf(f, "\t\t\titalic: {\n");
+			for(int i = 0; i < font->charsLen; i++) {
+				printCharinfo(f, "\t\t\t\t", &font->italic[i]);
+			}
+			fprintf(f, "\t\t\t},\n");
+		}
+		if(font->hasBoldItalic) {
+			fprintf(f, "\t\t\tboldItalic: {\n");
+			for(int i = 0; i < font->charsLen; i++) {
+				printCharinfo(f, "\t\t\t\t", &font->boldItalic[i]);
+			}
+			fprintf(f, "\t\t\t},\n");
+		}
+		
+		fprintf(f, "\t\t},\n");
+	}
+	fprintf(f, "\t},\n");
+	
+	fprintf(f, "}");
+	
+	
+	fclose(f);
+}
 
 // bump on format changes. there is no backward compatibility. saving is for caching only.
 static uint16_t GUIFONT_ATLAS_FILE_VERSION = 2;

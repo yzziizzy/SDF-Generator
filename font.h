@@ -38,11 +38,18 @@ typedef struct GUIFont {
 	
 	char* name;
 	
+	char hasRegular;
+	char hasItalic;
+	char hasBold;
+	char hasBoldItalic;
+	
 	int charsLen;
 	struct charInfo* regular;
 	struct charInfo* italic;
 	struct charInfo* bold;
 	struct charInfo* boldItalic;
+	
+	int size;
 	
 	// TODO: kerning info
 	
@@ -114,6 +121,8 @@ void FontManager_saveAtlas(FontManager* fm, char* path);
 int FontManager_loadAtlas(FontManager* fm, char* path);
 void FontManager_addFont2(FontManager* fm, char* name, char* charset, int size, char bold, char italic);
 void FontManager_finalize(FontManager* fm);
+
+void FontManager_saveJSON(FontManager* fm, char* path);
 
 GUIFont* FontManager_findFont(FontManager* fm, char* name);
 

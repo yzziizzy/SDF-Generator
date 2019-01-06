@@ -369,6 +369,8 @@ int main(int argc, char* argv[]) {
 				an--;
 				break;
 			}
+			
+			continue;
 		}
 		
 		
@@ -389,15 +391,16 @@ int main(int argc, char* argv[]) {
 			json_outfile = outfile;
 		}
 		if(!png_outfile) {
-			// TODO: check for and append %d if needed
 			png_outfile = outfile;
 		}
 	}
 	
 
+	// TODO: check for and append %d if needed
 	
 	// TODO: check for and append .png and .json 
-	
+	json_outfile = strappend(json_outfile, ".json");
+	png_outfile = strappend(png_outfile, ".png");
 	
 	// clean things up a bit
 	VEC_SORT(&g_sizes, (void*)int_comp);
@@ -525,6 +528,8 @@ int main(int argc, char* argv[]) {
 		FontManager_finalize(fm);
 		
 		FontManager_createAtlas(fm);
+		
+		FontManager_saveJSON(fm, json_outfile);
 		
 // 		FontManager_saveAtlas(fm, "fonts.atlas");
 	}
