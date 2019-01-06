@@ -67,9 +67,6 @@ static int int_comp(int* a, int* b) {
 
 
 
-char* sampleShader = "NIH\n" \
-;
-
 
 char* helpText = "" \
 	"Usage:\n" \
@@ -106,13 +103,12 @@ char* helpText = "" \
 	"  -bi        Generate Bold Italic\n" \
 	"  -c CHARSET Specify the charset. Default is every character on a US keyboard.\n" \
 	"  -i         Generate Italic\n" \
-	"  --omit-regular  Do not generate the regular font style\n" \
+	"  --omit-regular  Do not generate the regular font face\n" \
 	"  -s N[,...] Generate these output font sizes.\n" \
 	"\n" \
 	"MISC OPTIONS:\n" \
 	"  --help      Print this message and exit\n" \
 	"  --pretend   Verify parameters but do not actually generate output.\n" \
-	"  --shader    Print a sample fragment shader and exit\n" \
 ;
 
 
@@ -181,11 +177,6 @@ int main(int argc, char* argv[]) {
 		
 		if(0 == strcmp(arg, "--help")) {
 			puts(helpText);
-			exit(0);
-		}
-		
-		if(0 == strcmp(arg, "--shader")) {
-			puts(sampleShader);
 			exit(0);
 		}
 		
@@ -503,6 +494,12 @@ int main(int argc, char* argv[]) {
 		if(verbose >= 0) printf("Skipping generation (--pretend)\n");
 	}
 	else {
+		
+		if(totalGlyphsToRender == 0) {
+			if(verbose >= 0) printf("Nothing to generate. Check your options (use -v).\n");
+			exit(0);
+		}
+		
 		FontManager* fm;
 		
 		fm = FontManager_alloc();
@@ -527,11 +524,18 @@ int main(int argc, char* argv[]) {
 		
 		FontManager_finalize(fm);
 		
+		if(VEC_LEN(&fm->gen) == 0) {
+			if(verbose >= 0) printf("No glyphs generated. Error?\n");
+			exit(0);
+		}
+		
 		FontManager_createAtlas(fm);
 		
 		FontManager_saveJSON(fm, json_outfile);
 		
 // 		FontManager_saveAtlas(fm, "fonts.atlas");
+		
+		
 	}
 		
 	return 0;

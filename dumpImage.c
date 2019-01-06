@@ -33,7 +33,7 @@ int writePNG(char* path, unsigned int channels, char* data, unsigned int w, unsi
 	
 	int ret = 2;
 
-	printf("png write | w: %d, h: %d \n", w, h);
+// 	printf("png write | w: %d, h: %d \n", w, h);
 
 	if(channels > 4 || channels < 1) {
 		return 3;
@@ -43,7 +43,7 @@ int writePNG(char* path, unsigned int channels, char* data, unsigned int w, unsi
 	f = fopen(path, "wb");
 	if(!f) {
 		fprintf(stderr, "Could not open \"%s\" (writePNG).\n", path);
-		return 1;
+		exit(1);
 	}
 	
 	/*

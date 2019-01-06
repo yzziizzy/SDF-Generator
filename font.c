@@ -535,7 +535,7 @@ void FontManager_createAtlas(FontManager* fm) {
 				
 				sprintf(buf, fm->pngFileFormat, (int)VEC_LEN(&fm->atlas));
 				writePNG(buf, 1, texData, pot, pot);
-				
+				if(fm->verbose >= 0) printf("Saved atlas file '%s'\n", buf);
 				
 				texData = malloc(sizeof(*texData) * pot * pot);
 				// make everything white, the "empty" value
@@ -591,7 +591,7 @@ void FontManager_createAtlas(FontManager* fm) {
 		c->size.x = gen->sdfDataSize.x;
 		c->size.y = gen->sdfDataSize.y;
 		
-		printf("toff: %f, %f \n", c->texNormOffset.x, c->texNormOffset.y);
+// 		printf("toff: %f, %f \n", c->texNormOffset.x, c->texNormOffset.y);
 //		printf("tsize: %f, %f \n", c->texNormSize.x, c->texNormSize.y);
 //		printf("ltoff: %f, %f \n", c->topLeftOffset.x, c->topLeftOffset.y);
 		
@@ -608,6 +608,7 @@ void FontManager_createAtlas(FontManager* fm) {
 	
 	sprintf(buf, fm->pngFileFormat, (int)VEC_LEN(&fm->atlas));
 	writePNG(buf, 1, texData, pot, pot);
+	if(fm->verbose >= 0) printf("Saved atlas file '%s'\n", buf);
 	
 	VEC_FREE(&fm->gen);
 	
@@ -623,23 +624,34 @@ void FontManager_createAtlas(FontManager* fm) {
 
 void printCharinfo(FILE* f, char* prefix, struct charInfo* ci) {
 	if(ci->code == 0) return;
-	fprintf(f, "%s%d: {\n", prefix, ci->code);
-	fprintf(f, "%s\tcode: %d,\n", prefix, ci->code);
-	fprintf(f, "%s\ttexIndex: %d,\n", prefix, ci->texIndex);
-	fprintf(f, "%s\ttexelOffset: [%d, %d],\n", prefix, ci->texelOffset.x, ci->texelOffset.y);
-	fprintf(f, "%s\ttexelSize: [%d, %d],\n", prefix, ci->texelSize.x, ci->texelSize.y);
-	fprintf(f, "%s\tnormalizedOffset: [%f, %f],\n", prefix, ci->texNormOffset.x, ci->texNormOffset.y);
-	fprintf(f, "%s\tnormalizedSize: [%f, %f],\n", prefix, ci->texNormSize.x, ci->texNormSize.y);
-	fprintf(f, "%s\tadvance: %f,\n", prefix, ci->advance);
-	fprintf(f, "%s\tboxOffset: [%f, %f],\n", prefix, ci->topLeftOffset.x, ci->topLeftOffset.y);
-	fprintf(f, "%s\tboxSize: [%f, %f]\n", prefix, ci->size.x, ci->size.y);
-	fprintf(f, "%s},\n", prefix);
+// 	fprintf(f, "%s%d: {\n", prefix, ci->code);
+// 	fprintf(f, "%s\tcode: %d,\n", prefix, ci->code);
+// 	fprintf(f, "%s\ttexIndex: %d,\n", prefix, ci->texIndex);
+// 	fprintf(f, "%s\ttexelOffset: [%d, %d],\n", prefix, ci->texelOffset.x, ci->texelOffset.y);
+// 	fprintf(f, "%s\ttexelSize: [%d, %d],\n", prefix, ci->texelSize.x, ci->texelSize.y);
+// 	fprintf(f, "%s\tnormalizedOffset: [%f, %f],\n", prefix, ci->texNormOffset.x, ci->texNormOffset.y);
+// 	fprintf(f, "%s\tnormalizedSize: [%f, %f],\n", prefix, ci->texNormSize.x, ci->texNormSize.y);
+// 	fprintf(f, "%s\tadvance: %f,\n", prefix, ci->advance);
+// 	fprintf(f, "%s\tboxOffset: [%f, %f],\n", prefix, ci->topLeftOffset.x, ci->topLeftOffset.y);
+// 	fprintf(f, "%s\tboxSize: [%f, %f]\n", prefix, ci->size.x, ci->size.y);
+// 	fprintf(f, "%s},\n", prefix);
+	fprintf(f, "%s%d: [ ", prefix, ci->code);
+	fprintf(f, "%d, ", ci->code);
+	fprintf(f, "%d, ", ci->texIndex);
+	fprintf(f, "[%d, %d], ", ci->texelOffset.x, ci->texelOffset.y);
+	fprintf(f, "[%d, %d], ", ci->texelSize.x, ci->texelSize.y);
+	fprintf(f, "[%f, %f], ", ci->texNormOffset.x, ci->texNormOffset.y);
+	fprintf(f, "[%f, %f], ", ci->texNormSize.x, ci->texNormSize.y);
+	fprintf(f, "%f, ", ci->advance);
+	fprintf(f, "[%f, %f], ", ci->topLeftOffset.x, ci->topLeftOffset.y);
+	fprintf(f, "[%f, %f] ", ci->size.x, ci->size.y);
+	fprintf(f, "],\n", prefix);
 }
 
 
 void FontManager_saveJSON(FontManager* fm, char* path) {
 	FILE* f;
-	printf("writing json\n");
+
 	f = fopen(path, "w");
 	if(!f) {
 		fprintf(stderr, "Could not save JSON metadata to '%s'\n", path);
@@ -655,6 +667,20 @@ void FontManager_saveJSON(FontManager* fm, char* path) {
 		fprintf(f, "\",\n");
 	}
 	fprintf(f, "\t],\n");
+	
+	fprintf(f, "\tcharInfoIndices: {,\n");
+	fprintf(f, "\t\tcode: 0,\n");
+	fprintf(f, "\t\ttexIndex: 1,\n");
+	fprintf(f, "\t\ttexelOffset: 2,\n");
+	fprintf(f, "\t\ttexelSize: 3,\n");
+	fprintf(f, "\t\tnormalizedOffset: 4,\n");
+	fprintf(f, "\t\tnormalizedSize: 5,\n");
+	fprintf(f, "\t\tadvance: 6,\n");
+	fprintf(f, "\t\tboxOffset: 7,\n");
+	fprintf(f, "\t\tboxSize: 8,\n");
+	
+	fprintf(f, "\t},\n");
+	
 	fprintf(f, "\tfonts: {\n");
 	HT_LOOP(&fm->fonts, name, GUIFont*, font) {
 		fprintf(f, "\t\t\"%s\": {\n", font->name);
@@ -699,157 +725,11 @@ void FontManager_saveJSON(FontManager* fm, char* path) {
 	
 	
 	fclose(f);
+	
+	if(fm->verbose >= 0) printf("Saved config file '%s'\n", path);
 }
 
-// bump on format changes. there is no backward compatibility. saving is for caching only.
-static uint16_t GUIFONT_ATLAS_FILE_VERSION = 2;
 
-void FontManager_saveAtlas(FontManager* fm, char* path) {
-	FILE* f;
-	uint16_t u16;
-	
-	f = fopen(path, "wb");
-	if(!f) {
-		fprintf(stderr, "Could not save font atlas to '%s'\n", path);
-		return;
-	}
-	
-	// write the file version
-	fwrite(&GUIFONT_ATLAS_FILE_VERSION, 1, 2, f);
-	
-	HT_LOOP(&fm->fonts, fName, GUIFont*, font) {
-		// save the font
-		// font identifier
-		fwrite("F", 1, 1, f);
-		
-		// name length
-		uint16_t nlen = strlen(font->name); 
-		fwrite(&nlen, 1, 2, f);
-		
-		//name 
-		fwrite(font->name, 1, nlen, f);
-		
-		// number of charInfo structs
-		uint32_t clen = font->charsLen;
-		fwrite(&clen, 1, 4, f);
-		
-		// the charInfo structs
-		fwrite(font->regular, 1, clen * sizeof(*font->regular), f);
-		fwrite(font->bold, 1, clen * sizeof(*font->bold), f);
-		fwrite(font->italic, 1, clen * sizeof(*font->italic), f);
-		fwrite(font->boldItalic, 1, clen * sizeof(*font->boldItalic), f);
-	}
-	
-	// atlas identifier
-	fwrite("A", 1, 1, f);
-	
-	// max atlas size
-	fwrite(&fm->maxAtlasSize, 1, 4, f);
-	
-	// number of atlas layers
-	u16 = VEC_LEN(&fm->atlas);
-	fwrite(&u16, 1, 2, f);
-	
-	// atlas dimension (always square)
-	fwrite(&fm->atlasSize, 1, 4, f);
-	
-	// atlas data
-	VEC_EACH(&fm->atlas, ind, at) {
-		fwrite(at, 1, fm->atlasSize * fm->atlasSize * sizeof(*at), f);
-	}
-	
-	
-	// done
-	fclose(f);
-}
 
-int FontManager_loadAtlas(FontManager* fm, char* path) {
-	FILE* f;
-	
-	f = fopen(path, "rb");
-	if(!f) {
-		fprintf(stderr, "Could not open font atlas '%s'\n", path);
-		return 1;
-	}
-	
-	
-	uint8_t u8;
-	uint16_t u16;
-	uint32_t u32;
-	
-	// check the file version
-	int r = fread(&u16, 1, 2, f);
-	if(u16 != GUIFONT_ATLAS_FILE_VERSION) {
-		printf("Font atlas file version mismatch. %d != %d, %d, '%s' \n", (int)u16, GUIFONT_ATLAS_FILE_VERSION, r, path);
-		fclose(f);
-		return 1;
-	}
-	
-	while(!feof(f)) {
-		// check the sigil sigil
-		fread(&u8, 1, 1, f);
-		
-		if(u8 == 'F') {
-			
-			GUIFont* gf = calloc(1, sizeof(*gf)); 
-			
-			// name length and name string
-			fread(&u16, 1, 2, f);
-			gf->name = malloc(u16 + 1);
-			fread(gf->name, 1, u16, f);
-			gf->name[u16] = 0;
-			
-			HT_set(&fm->fonts, gf->name, gf);
-			
-			// charInfo array length
-			fread(&u32, 1, 4, f);
-			gf->charsLen = u32;
-			gf->regular = malloc(u32 * sizeof(*gf->regular));
-			gf->bold = malloc(u32 * sizeof(*gf->bold));
-			gf->italic = malloc(u32 * sizeof(*gf->italic));
-			gf->boldItalic = malloc(u32 * sizeof(*gf->boldItalic));
-			
-			// charInfo structs
-			fread(gf->regular, 1, u32 * sizeof(*gf->regular), f);
-			fread(gf->bold, 1, u32 * sizeof(*gf->bold), f);
-			fread(gf->italic, 1, u32 * sizeof(*gf->italic), f);
-			fread(gf->boldItalic, 1, u32 * sizeof(*gf->boldItalic), f);
-			
-		}
-		else if(u8 == 'A') { // atlas
-			
-			// max atlas size
-			fread(&u32, 1, 4, f);
-			fm->maxAtlasSize = u32;
-			
-			// number of layers
-			fread(&u16, 1, 2, f);
-			int layerNum = u16;
-			
-			// atlas dimension
-			fread(&u32, 1, 4, f);
-			fm->atlasSize = u32;
-			
-			printf("atlas size: %d\n", u32);
-
-			// atlas data
-			for(int i = 0; i < layerNum; i++) {
-				uint8_t* at;
-				
-				at = malloc(u32 * u32 * sizeof(*at));
-				fread(at, 1, u32 * u32 * 1, f);
-				VEC_PUSH(&fm->atlas, at);
-			}
-			
-			break;
-		}
-	}
-	
-	fclose(f);
-	
-	
-	
-	return 0;
-}
 
 
