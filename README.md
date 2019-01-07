@@ -6,7 +6,7 @@ Includes UTF-8 support.
 
 ```
 Usage:
-sdfgen [GLOBAL OPTION]... [-f FONT SIZES [OPTION]...]... [outfile]
+sdfgen [GLOBAL OPTION]... [-f FONT [OPTION]...]... [outfile]
 
 EXAMPLE:
   sdfgen -b -m 8 -o 4 -t 256 -f "Courier" 8,12,16 -i -f "Arial" 32 myfonts_sdf
@@ -23,6 +23,7 @@ EXAMPLE:
 
 OPTIONS:
      All Font Options can be included as global options for all fonts.
+  -f ...     Add a font to render
   -J         Specify the output JSON file name
   -l N       Limit computation to N threads
   -m         SDF magnitude in pixels. Default 8.

@@ -1,0 +1,13 @@
+fix output file naming extensions and %d's
+remove non-printing characters from texture output
+sample shaders
+TODO's in options parsing
+js lib to generate vertex buffers
+kerning info
+progress printouts
+charset quotehandling?
+"quad" sizing, eg pot/2
+fix font/size groupings in json output
+box and advance scaling seems to have been wrong. fixed?
+fix json generation to be "proper". remove trailing commas
+

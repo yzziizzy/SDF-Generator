@@ -176,6 +176,7 @@ char* helpText = "" \
 	"\n" \
 	"OPTIONS:\n" \
 	"     All Font Options can be included as global options for all fonts.\n" \
+	"  -f ...     Add a font to render\n" \
 	"  -J         Specify the output JSON file name\n" \
 	"  -l N       Limit computation to N threads\n" \
 	"  -m         SDF magnitude in pixels. Default 8.\n" \

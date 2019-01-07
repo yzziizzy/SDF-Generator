@@ -451,9 +451,21 @@ void FontManager_addFont2(FontManager* fm, char* name, uint32_t* charset, int si
 	// all character code inputs are unicode codepoints
 	FT_Select_Charmap(fontFace, FT_ENCODING_UNICODE);
 	
-	f = GUIFont_alloc(name);
-	f->size = size;
-	VEC_PUSH(&fm->fonts, f);
+	
+	// look for an existing matching font
+	f = NULL;
+	VEC_EACH(&fm->fonts, fi, fo) {
+		if(size == fo->size && 0 == strcmp(fo->name, name)) {
+			f = fo;
+			break;
+		}
+	}
+	
+	if(f == NULL) {
+		f = GUIFont_alloc(name);
+		f->size = size;
+		VEC_PUSH(&fm->fonts, f);
+	}
 	
 	for(int i = 0; i < len; i++) {
 // 		printf("calc: '%s':%d:%d %c\n", name, bold, italic, charset[i]);
@@ -567,10 +579,10 @@ void FontManager_createAtlas(FontManager* fm) {
 		c->texNormSize.x = (float)gen->sdfDataSize.x / (float)pot;
 		c->texNormSize.y = (float)gen->sdfDataSize.y / (float)pot;
 		
-		// BUG: wrong? needs magnitude?
-		c->advance = gen->rawAdvance / (float)gen->oversample;
-		c->topLeftOffset.x = (gen->rawBearing.x / (float)gen->oversample);// + (float)gen->sdfBounds.min.x;
-		c->topLeftOffset.y = (gen->rawBearing.y / (float)gen->oversample);// - (float)gen->sdfBounds.min.y;
+		// BUG: wrong? needs magnitude? used to be just oversample. looks like it needs to be both
+		c->advance = gen->rawAdvance / (float)gen->magnitude / (float)gen->oversample;
+		c->topLeftOffset.x = (gen->rawBearing.x / (float)gen->magnitude / (float)gen->oversample);// + (float)gen->sdfBounds.min.x;
+		c->topLeftOffset.y = (gen->rawBearing.y / (float)gen->magnitude / (float)gen->oversample);// - (float)gen->sdfBounds.min.y;
 		c->size.x = gen->sdfDataSize.x;
 		c->size.y = gen->sdfDataSize.y;
 		
@@ -611,7 +623,7 @@ void printCharinfo(FILE* f, char* prefix, struct charInfo* ci) {
 // 	fprintf(f, "%s\tboxOffset: [%f, %f],\n", prefix, ci->topLeftOffset.x, ci->topLeftOffset.y);
 // 	fprintf(f, "%s\tboxSize: [%f, %f]\n", prefix, ci->size.x, ci->size.y);
 // 	fprintf(f, "%s},\n", prefix);
-	fprintf(f, "%s%d: [ ", prefix, ci->code);
+	fprintf(f, "%s\"%d\": [ ", prefix, ci->code);
 	fprintf(f, "%d, ", ci->code);
 	fprintf(f, "%d, ", ci->texIndex);
 	fprintf(f, "[%d, %d], ", ci->texelOffset.x, ci->texelOffset.y);
@@ -636,7 +648,7 @@ void FontManager_saveJSON(FontManager* fm, char* path) {
 	
 	fprintf(f, "{\n");
 	
-	fprintf(f, "\tlayers: [\n");
+	fprintf(f, "\t\"layers\": [\n");
 	VEC_LOOP(&fm->atlas, fi) {
 		fprintf(f, "\t\t\"");
 		fprintf(f, fm->pngFileFormat, (int)fi);
@@ -644,49 +656,49 @@ void FontManager_saveJSON(FontManager* fm, char* path) {
 	}
 	fprintf(f, "\t],\n");
 	
-	fprintf(f, "\tcharInfoIndices: {,\n");
-	fprintf(f, "\t\tcode: 0,\n");
-	fprintf(f, "\t\ttexIndex: 1,\n");
-	fprintf(f, "\t\ttexelOffset: 2,\n");
-	fprintf(f, "\t\ttexelSize: 3,\n");
-	fprintf(f, "\t\tnormalizedOffset: 4,\n");
-	fprintf(f, "\t\tnormalizedSize: 5,\n");
-	fprintf(f, "\t\tadvance: 6,\n");
-	fprintf(f, "\t\tboxOffset: 7,\n");
-	fprintf(f, "\t\tboxSize: 8,\n");
+	fprintf(f, "\t\"charInfoIndices\": {\n");
+	fprintf(f, "\t\t\"code\": 0,\n");
+	fprintf(f, "\t\t\"texIndex\": 1,\n");
+	fprintf(f, "\t\t\"texelOffset\": 2,\n");
+	fprintf(f, "\t\t\"texelSize\": 3,\n");
+	fprintf(f, "\t\t\"normalizedOffset\": 4,\n");
+	fprintf(f, "\t\t\"normalizedSize\": 5,\n");
+	fprintf(f, "\t\t\"advance\": 6,\n");
+	fprintf(f, "\t\t\"boxOffset\": 7,\n");
+	fprintf(f, "\t\t\"boxSize\": 8\n");
 	
 	fprintf(f, "\t},\n");
 	
-	fprintf(f, "\tfonts: {\n");
+	fprintf(f, "\t\"fonts\": {\n");
 	VEC_EACH(&fm->fonts, fi, font) {
-		fprintf(f, "\t\t\"%s\": {\n", font->name);
+		fprintf(f, "\t\t\"%s-%d\": {\n", font->name, font->size);
 		
-		fprintf(f, "\t\t\tname: \"%s\",\n", font->name);
-		fprintf(f, "\t\t\tsize: %d,\n", font->size);
+		fprintf(f, "\t\t\t\"name\": \"%s\",\n", font->name);
+		fprintf(f, "\t\t\t\"size\": %d,\n", font->size);
 		
 		if(font->hasRegular) {
-			fprintf(f, "\t\t\tregular: {\n");
+			fprintf(f, "\t\t\t\"regular\": {\n");
 			for(int i = 0; i < font->charsLen; i++) {
 				printCharinfo(f, "\t\t\t\t", font->regular + i);
 			}
 			fprintf(f, "\t\t\t},\n");
 		}
 		if(font->hasBold) {
-			fprintf(f, "\t\t\tbold: {\n");
+			fprintf(f, "\t\t\t\"bold\": {\n");
 			for(int i = 0; i < font->charsLen; i++) {
 				printCharinfo(f, "\t\t\t\t", &font->bold[i]);
 			}
 			fprintf(f, "\t\t\t},\n");
 		}
 		if(font->hasItalic) {
-			fprintf(f, "\t\t\titalic: {\n");
+			fprintf(f, "\t\t\t\"italic\": {\n");
 			for(int i = 0; i < font->charsLen; i++) {
 				printCharinfo(f, "\t\t\t\t", &font->italic[i]);
 			}
 			fprintf(f, "\t\t\t},\n");
 		}
 		if(font->hasBoldItalic) {
-			fprintf(f, "\t\t\tboldItalic: {\n");
+			fprintf(f, "\t\t\t\"boldItalic\": {\n");
 			for(int i = 0; i < font->charsLen; i++) {
 				printCharinfo(f, "\t\t\t\t", &font->boldItalic[i]);
 			}
@@ -695,7 +707,7 @@ void FontManager_saveJSON(FontManager* fm, char* path) {
 		
 		fprintf(f, "\t\t},\n");
 	}
-	fprintf(f, "\t},\n");
+	fprintf(f, "\t}\n");
 	
 	fprintf(f, "}");
 	
