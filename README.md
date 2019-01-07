@@ -68,7 +68,7 @@ make
 
 ## License
 
-Unless otherwise noted, this project is released under the Affero GNU Public License version 3.0.
+Unless otherwise noted, this project is released under the GNU Affero General Public License version 3.0.
 
 unifont-11.0.03.ttf is released under GPL2+ by the GNU Project. http://unifoundry.com/unifont/index.html
 
